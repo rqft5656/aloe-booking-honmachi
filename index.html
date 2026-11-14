@@ -430,6 +430,20 @@ header {
   transition: background 0.2s;
 }
 .admin-toggle:hover { background: var(--gold-pale); }
+
+/* Modal notice (hidden, animates in after copy) */
+.modal-notice {
+  font-size: 13px; color: #C08040; background: #FDF8F0;
+  border: 1px solid var(--gold-light); border-radius: 10px;
+  line-height: 1.8; letter-spacing: 0.04em; text-align: center; font-weight: 500;
+  max-height: 0; overflow: hidden; opacity: 0;
+  transition: max-height 0.4s ease, opacity 0.4s ease, padding 0.4s ease, margin 0.4s ease;
+  padding-top: 0; padding-bottom: 0; margin-bottom: 0;
+}
+.modal-notice.show {
+  max-height: 120px; opacity: 1;
+  padding: 14px 16px; margin-bottom: 14px;
+}
 </style>
 </head>
 <body>
@@ -503,6 +517,7 @@ header {
       <button class="btn-copy" id="copyBtn" onclick="copyMessage()">
         コピーする
       </button>
+      <div class="modal-notice" id="modalNotice">⏳ 予約リクエスト受信後、スタッフが確認の上ご連絡いたします。少々お時間をいただいております。</div>
       <div class="copy-hint" id="copyHint">コピーしたらLINEを開いて貼り付けて送信してください</div>
       <button class="btn-confirm" onclick="sendRequest()">
         <div class="line-circle">
@@ -648,6 +663,14 @@ function isSlotPast(dateStr, time) {
   slotTime.setHours(h, m, 0, 0);
   return slotTime < now;
 }
+// 当日18時以降は自動で満員
+function isTodayLateSlot(dateStr, time) {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  if (dateStr !== todayStr) return false;
+  const [h] = time.split(':').map(Number);
+  return h >= 18;
+}
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -690,7 +713,8 @@ function renderPatient() {
         el.dataset.date = ds; el.dataset.time = t; el.dataset.display = displayDate(d);
         el.innerHTML = `<span class="slot-t">${t}</span><span class="slot-s">${isLast?'最終受付':STATUS_LABELS[st]}</span>`;
         const pastSlot = isSlotPast(ds, t);
-        if (pastSlot) {
+        const lateSlot = isTodayLateSlot(ds, t);
+        if (pastSlot || lateSlot) {
           el.className = `slot closed${isLast?' last-badge':''}`;
           el.querySelector('.slot-s').textContent = '受付終了';
         } else if (st !== 'closed') {
@@ -734,11 +758,13 @@ function openModal() {
   const txt = `${selectedSlot.dataset.display}${selectedSlot.dataset.time}〜`;
   const msg = `【予約リクエスト】
 メニュー：整体・鍼灸
-希望日時：${txt}`;
+希望日時：${txt}
+※リクエストのため、時間が前後する場合がございます。`;
   document.getElementById('copyText').textContent = msg;
   document.getElementById('copyBtn').textContent = 'コピーする';
   document.getElementById('copyBtn').classList.remove('copied');
   document.getElementById('copyHint').textContent = 'コピーしたらLINEを開いて貼り付けて送信してください';
+  document.getElementById('modalNotice').classList.remove('show');
   document.getElementById('confirmOverlay').classList.add('show');
 }
 
@@ -749,6 +775,7 @@ function copyMessage() {
     btn.textContent = '✓ コピーしました！';
     btn.classList.add('copied');
     document.getElementById('copyHint').textContent = '次に「LINEを開く」をタップして貼り付けて送信してください';
+    document.getElementById('modalNotice').classList.add('show');
   }).catch(() => {
     // fallback for older browsers
     const el = document.getElementById('copyText');
@@ -762,6 +789,7 @@ function copyMessage() {
     btn.textContent = '✓ コピーしました！';
     btn.classList.add('copied');
     document.getElementById('copyHint').textContent = '次に「LINEを開く」をタップして貼り付けて送信してください';
+    document.getElementById('modalNotice').classList.add('show');
   });
 }
 
